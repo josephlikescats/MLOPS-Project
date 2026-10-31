@@ -1,0 +1,243 @@
+{
+  "generated_at": "2026-10-31T01:12:58.449787+00:00",
+  "data_source": "auto",
+  "model": {
+    "version": "retail-churn-classifier/v2",
+    "family": "random_forest",
+    "origin": "artifact",
+    "threshold": 0.34,
+    "trained_at": "2026-10-31T01:12:30.824040+00:00"
+  },
+  "scoring_population": {
+    "rows": 4269,
+    "cutoff": "2011-12-09"
+  },
+  "data_quality": {
+    "rows": 4269,
+    "duplicate_customers": 0,
+    "checks": {
+      "recency_days": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 0.0,
+        "max": 364.0,
+        "mean": 87.04356992269852,
+        "status": "pass"
+      },
+      "frequency": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 1.0,
+        "max": 398.0,
+        "mean": 7.827828531271961,
+        "status": "pass"
+      },
+      "monetary": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 3.75,
+        "max": 580987.04,
+        "mean": 3751.0545420473177,
+        "status": "pass"
+      },
+      "average_order_value": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 3.75,
+        "max": 84236.25,
+        "mean": 399.18860541850034,
+        "status": "pass"
+      },
+      "tenure_days": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 0.0,
+        "max": 738.0,
+        "mean": 438.8779573670649,
+        "status": "pass"
+      },
+      "distinct_products": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 1.0,
+        "max": 2550.0,
+        "mean": 99.93745607870696,
+        "status": "pass"
+      },
+      "avg_items_per_order": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 1.0,
+        "max": 40498.5,
+        "mean": 236.7712061013072,
+        "status": "pass"
+      },
+      "avg_interpurchase_days": {
+        "null_rate": 0.1698,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 0.0,
+        "max": 714.0,
+        "mean": 106.20480367275877,
+        "status": "pass"
+      },
+      "orders_last_90d": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 0.0,
+        "max": 89.0,
+        "mean": 1.5521199344108692,
+        "status": "pass"
+      },
+      "revenue_last_90d": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 0.0,
+        "max": 168469.6,
+        "mean": 801.8507753572266,
+        "status": "pass"
+      },
+      "revenue_trend_ratio": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 0.00013316022504078031,
+        "max": 168470.6,
+        "mean": 271.42977473169844,
+        "status": "pass"
+      },
+      "distinct_active_months": {
+        "null_rate": 0.0,
+        "non_finite": 0,
+        "domain_violations": 0,
+        "min": 1.0,
+        "max": 25.0,
+        "mean": 5.334738814710705,
+        "status": "pass"
+      }
+    },
+    "failing_features": [],
+    "status": "pass",
+    "max_null_rate": 0.05
+  },
+  "drift": {
+    "reference_rows": 4334,
+    "current_rows": 4269,
+    "features": {
+      "recency_days": {
+        "psi": 0.3224,
+        "status": "significant"
+      },
+      "frequency": {
+        "psi": 0.0352,
+        "status": "stable"
+      },
+      "monetary": {
+        "psi": 0.0303,
+        "status": "stable"
+      },
+      "average_order_value": {
+        "psi": 0.004,
+        "status": "stable"
+      },
+      "tenure_days": {
+        "psi": 0.5282,
+        "status": "significant"
+      },
+      "distinct_products": {
+        "psi": 0.0262,
+        "status": "stable"
+      },
+      "avg_items_per_order": {
+        "psi": 0.0072,
+        "status": "stable"
+      },
+      "avg_interpurchase_days": {
+        "psi": 0.0187,
+        "status": "stable"
+      },
+      "orders_last_90d": {
+        "psi": 0.1007,
+        "status": "moderate"
+      },
+      "revenue_last_90d": {
+        "psi": 0.2175,
+        "status": "moderate"
+      },
+      "revenue_trend_ratio": {
+        "psi": 0.2967,
+        "status": "significant"
+      },
+      "distinct_active_months": {
+        "psi": 0.0355,
+        "status": "stable"
+      }
+    },
+    "worst_feature": "tenure_days",
+    "worst_psi": 0.5282,
+    "overall_status": "significant",
+    "thresholds": {
+      "warn": 0.1,
+      "alert": 0.25
+    },
+    "reference": "churn_training_features.csv @ 2011-08-31"
+  },
+  "performance": {
+    "status": "pass",
+    "evaluation_cutoff": "2011-08-31",
+    "metrics": {
+      "rows": 4334,
+      "positive_rate": 0.5064605445316105,
+      "threshold": 0.34,
+      "accuracy": 0.6536686663590217,
+      "precision": 0.5986916951080774,
+      "recall": 0.958997722095672,
+      "f1": 0.7371738749781124,
+      "roc_auc": 0.7654638181680707,
+      "average_precision": 0.7343658327637308,
+      "brier_score": 0.19708040706128746,
+      "confusion_matrix": {
+        "true_negative": 728,
+        "false_positive": 1411,
+        "false_negative": 90,
+        "true_positive": 2105
+      }
+    },
+    "breaches": [],
+    "floors": {
+      "min_precision": 0.55,
+      "min_recall": 0.55,
+      "min_roc_auc": 0.65
+    }
+  },
+  "latency": {
+    "status": "pass",
+    "rows_scored": 4269,
+    "repeats": 5,
+    "batch_ms_mean": 112.88,
+    "batch_ms_p95": 118.34,
+    "per_row_ms_mean": 0.0264,
+    "max_p95_latency_ms": 250.0
+  },
+  "model_age": {
+    "model_version": "retail-churn-classifier/v2",
+    "trained_at": "2026-10-31T01:12:30.824040+00:00",
+    "age_days": 0.0,
+    "max_model_age_days": 30,
+    "stale": false
+  },
+  "alerts": [
+    "drift: tenure_days PSI 0.5282 >= 0.25"
+  ],
+  "retrain_recommended": true,
+  "status": "action_required"
+}

@@ -1,4 +1,14 @@
-"""Produce a simple PSI report comparing training and scoring feature distributions."""
+"""
+Standalone PSI report for two feature CSVs (kept from Part 1).
+
+    python -m ml.drift_report <training.csv> <scoring.csv>
+
+The PSI implementation now lives in ml/monitoring.py, which this delegates to
+so there is only one definition of the metric. For the full Part 2 monitoring
+run - data quality, drift, performance, latency and the retraining decision -
+use ``python -m ml.monitoring`` instead; this command is the narrow
+two-files-in, PSI-out case.
+"""
 from __future__ import annotations
 
 import argparse
@@ -7,28 +17,38 @@ from pathlib import Path
 
 import pandas as pd
 
+from ml.monitoring import population_stability_index, psi_status
 
-def population_stability_index(expected: pd.Series, actual: pd.Series, bins: int = 10) -> float:
-    edges = expected.quantile([i / bins for i in range(bins + 1)]).drop_duplicates().values
-    if len(edges) < 2:
-        return 0.0
-    expected_counts = pd.cut(expected, bins=edges, include_lowest=True).value_counts(normalize=True, sort=False)
-    actual_counts = pd.cut(actual, bins=edges, include_lowest=True).value_counts(normalize=True, sort=False)
-    expected_counts = expected_counts.clip(lower=0.0001)
-    actual_counts = actual_counts.clip(lower=0.0001)
-    return float(((actual_counts - expected_counts) * (actual_counts / expected_counts).map(lambda value: __import__("math").log(value))).sum())
+LEGACY_FEATURES = ["recency_days", "frequency", "monetary", "average_order_value"]
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="PSI between two feature files")
     parser.add_argument("training_csv")
     parser.add_argument("scoring_csv")
     parser.add_argument("--output", default="artifacts/drift_report.json")
+    parser.add_argument(
+        "--features",
+        nargs="*",
+        default=None,
+        help="columns to compare (default: the four Part 1 RFM features)",
+    )
     args = parser.parse_args()
+
     training = pd.read_csv(args.training_csv)
     scoring = pd.read_csv(args.scoring_csv)
-    columns = ["recency_days", "frequency", "monetary", "average_order_value"]
-    report = {column: population_stability_index(training[column], scoring[column]) for column in columns}
+    columns = args.features or [
+        column for column in LEGACY_FEATURES if column in training.columns
+    ]
+
+    report = {
+        column: {
+            "psi": round(population_stability_index(training[column], scoring[column]), 4),
+            "status": psi_status(population_stability_index(training[column], scoring[column])),
+        }
+        for column in columns
+    }
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
 

@@ -6,3 +6,10 @@ data/landing/
 airflow_logs/
 .env
 .env.local
+# Part 2: MLflow local tracking store + run artifacts
+mlflow.db
+mlruns/
+# Regenerated outputs; the model artifact itself is kept as evidence
+artifacts/churn_scores.csv
+artifacts/churn_training_features.csv
+artifacts/churn_scoring_features.csv

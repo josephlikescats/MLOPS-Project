@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     env_file: .env
     ports:
-      - "55432:5432"
+      - "25432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init/01_init.sh:/docker-entrypoint-initdb.d/01_init.sh
@@ -44,11 +44,23 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-      _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary==2.9.10"
+      # pandas MUST stay below 2.2 in the Airflow containers. Airflow 2.10 pins
+      # SQLAlchemy < 2.0, but pandas >= 2.2 requires SQLAlchemy >= 2.0; when
+      # pandas cannot import a SQLAlchemy it accepts, it silently falls back to
+      # treating an Engine as a raw DBAPI connection and every read_sql/to_sql
+      # call dies with "'Engine' object has no attribute 'cursor'" -- which is
+      # exactly how retail_etl's validate_and_stage task failed.
+      # ml/features.py no longer needs the 2.2-only "ME" alias; it normalises
+      # month-end to pd.offsets.MonthEnd(), which works in every version.
+      _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary==2.9.10 pandas>=2.1,<2.2 scikit-learn>=1.5,<2 joblib>=1.4,<2 mlflow>=2.17,<3 xgboost>=2.1,<3"
       PGHOST: postgres
       PGDATABASE: retail_dw
       PGUSER: airflow
       PGPASSWORD: airflow
+      # Part 2: where the churn_ml DAG tracks runs and writes artifacts.
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      ARTIFACTS_DIR: /opt/airflow/artifacts
+      PYTHONPATH: /opt/airflow
     ports:
       - "8080:8080"
     command: webserver
@@ -57,6 +69,8 @@ services:
       - ./scripts:/opt/airflow/scripts
       - ./data:/opt/airflow/data
       - ./sql:/opt/airflow/sql
+      - ./ml:/opt/airflow/ml
+      - ./artifacts:/opt/airflow/artifacts
       - airflow_logs:/opt/airflow/logs
 
   airflow-scheduler:
@@ -68,19 +82,101 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary==2.9.10"
+      # pandas MUST stay below 2.2 in the Airflow containers. Airflow 2.10 pins
+      # SQLAlchemy < 2.0, but pandas >= 2.2 requires SQLAlchemy >= 2.0; when
+      # pandas cannot import a SQLAlchemy it accepts, it silently falls back to
+      # treating an Engine as a raw DBAPI connection and every read_sql/to_sql
+      # call dies with "'Engine' object has no attribute 'cursor'" -- which is
+      # exactly how retail_etl's validate_and_stage task failed.
+      # ml/features.py no longer needs the 2.2-only "ME" alias; it normalises
+      # month-end to pd.offsets.MonthEnd(), which works in every version.
+      _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary==2.9.10 pandas>=2.1,<2.2 scikit-learn>=1.5,<2 joblib>=1.4,<2 mlflow>=2.17,<3 xgboost>=2.1,<3"
       PGHOST: postgres
       PGDATABASE: retail_dw
       PGUSER: airflow
       PGPASSWORD: airflow
+      # Part 2: where the churn_ml DAG tracks runs and writes artifacts.
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      ARTIFACTS_DIR: /opt/airflow/artifacts
+      PYTHONPATH: /opt/airflow
     command: scheduler
     volumes:
       - ./dags:/opt/airflow/dags
       - ./scripts:/opt/airflow/scripts
       - ./data:/opt/airflow/data
       - ./sql:/opt/airflow/sql
+      - ./ml:/opt/airflow/ml
+      - ./artifacts:/opt/airflow/artifacts
       - airflow_logs:/opt/airflow/logs
+
+  # ----------------------------------------------------- Part 2: MLOps services
+  # Started on demand:
+  #   docker compose up -d mlflow
+  #   docker compose up -d --build api dashboard
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MLFLOW_DB_HOST: postgres
+      MLFLOW_DB_PORT: 5432
+      MLFLOW_DB_USER: airflow
+      MLFLOW_DB_PASSWORD: airflow
+      MLFLOW_DB_NAME: mlflow
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: retail_dw
+      PGUSER: airflow
+      PGPASSWORD: airflow
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      # Unset by default, so the container serves the artifact it was built
+      # with and needs no network at startup. Set it to pin a registry
+      # version, e.g. models:/retail-churn-classifier/2
+      # CHURN_MODEL_URI: models:/retail-churn-classifier/latest
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mounted read-only so a host-side retrain is picked up by /reload
+      # without a rebuild, while the container cannot modify the artifacts.
+      - ./artifacts:/app/artifacts:ro
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: retail_dw
+      PGUSER: airflow
+      PGPASSWORD: airflow
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./artifacts:/app/artifacts:ro
 
 volumes:
   pgdata:
   airflow_logs:
+  mlflow_artifacts:

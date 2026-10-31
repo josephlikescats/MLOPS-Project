@@ -56,3 +56,47 @@ and `source_file`.
 Ingestion audit trail: source_file, extraction_date, row_count, status (success/failed),
 error_message. One row per file per status; this is what makes extract.py's incremental
 loading skip already-processed files on re-run.
+
+## Part 2: churn model feature table
+
+Built by `ml/features.py` from `staging.sales_valid`; written to
+`artifacts/churn_training_features.csv` (training snapshots, also the drift
+baseline) and `artifacts/churn_scoring_features.csv` (the current unlabelled
+population). One row per customer per month-end cutoff.
+
+| Column | Type | Definition |
+|---|---|---|
+| customer_id | integer | pseudonymous customer key, from staging |
+| snapshot_date | timestamp | the cutoff this row's features were computed at |
+| recency_days | integer | days from the customer's last order to the cutoff |
+| frequency | integer | distinct invoices on or before the cutoff |
+| monetary | numeric | total revenue on or before the cutoff |
+| average_order_value | numeric | monetary / frequency |
+| tenure_days | integer | days from the customer's first order to the cutoff |
+| distinct_products | integer | distinct stock_codes ever purchased |
+| avg_items_per_order | numeric | total quantity / frequency |
+| avg_interpurchase_days | numeric | mean gap between orders; **null** when frequency = 1, median-imputed inside the model pipeline |
+| orders_last_90d | integer | distinct invoices in the 90 days before the cutoff |
+| revenue_last_90d | numeric | revenue in the 90 days before the cutoff |
+| revenue_trend_ratio | numeric | (revenue_last_90d + 1) / (revenue_prior_90d + 1); > 1 accelerating, < 1 decelerating |
+| distinct_active_months | integer | distinct calendar months with at least one order |
+| churned | integer | **label**: 1 if the customer places no order in the 90 days after the cutoff, else 0. Absent from the scoring file, whose window has not closed. |
+
+Population rule: a row exists only for customers with at least one order in
+the 365 days before the cutoff. A customer silent longer than that has already
+churned rather than being at risk of it.
+
+## Part 2: scoring output
+
+`artifacts/churn_scores.csv` — the batch scorer's output, read by the
+dashboard and by `GET /customers/{id}/churn`.
+
+| Column | Type | Definition |
+|---|---|---|
+| (all feature columns above) | | the features the score was computed from |
+| churn_probability | numeric | model output, 0-1 |
+| churn_prediction | integer | 1 when churn_probability >= decision_threshold |
+| risk_band | text | low (<0.25), medium (<0.5), high (<0.75), critical (>=0.75) |
+| model_version | text | e.g. `retail-churn-classifier/v1` |
+| decision_threshold | numeric | the threshold that produced churn_prediction |
+

@@ -1,0 +1,10 @@
+# Scripts run inside Linux containers break on CRLF (e.g. db/init/01_init.sh's
+# "/bin/bash^M: bad interpreter" failure under Windows' core.autocrlf=true).
+# Force LF regardless of the checkout platform.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+*.py text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

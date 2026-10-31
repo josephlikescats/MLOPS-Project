@@ -1,0 +1,55 @@
+# Keeps the build context small. Without this the daemon receives .venv,
+# the 45MB source workbook and the local MLflow store on every build, which
+# turns a code-change rebuild into a multi-minute upload.
+#
+# NOTE: api/Dockerfile and dashboard/Dockerfile COPY requirements.txt, api/,
+# ml/, scripts/, dashboard/ and artifacts/ — none of those may be excluded.
+
+# Virtualenvs (host-side only; images install from requirements.txt)
+.venv/
+venv/
+.dist/
+
+# VCS and editor state
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# The dataset: 45MB workbook + 25 monthly landing CSVs. Airflow bind-mounts
+# ./data at runtime, so no image needs it baked in.
+data/
+
+# Local MLflow store — the server in Docker is Postgres-backed instead.
+mlruns/
+mlflow.db
+
+# Airflow runtime state
+airflow_logs/
+logs/
+
+# Not used by any image: DAGs and SQL are bind-mounted into Airflow,
+# and tests/docs are not part of a runtime image.
+dags/
+tests/
+docs/
+db/
+sql/
+
+# Secrets stay out of image layers (compose passes them as env at runtime).
+.env
+.env.local
+
+# Host launcher scripts
+start.bat
+start.ps1
+demo.bat
+demo.ps1

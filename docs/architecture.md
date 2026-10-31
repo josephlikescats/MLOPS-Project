@@ -28,12 +28,16 @@ flowchart LR
         ST["Streamlit dashboard\n(dashboard/app.py)"]
     end
 
-    subgraph MLOps["MLOps repeat-purchase layer"]
-      TRAIN["ml/train_model.py\nfeatures + evaluation"]
-      ARTIFACT["artifacts/\nmodel + metrics"]
-      API["FastAPI\napi/main.py"]
-      SCORE["Batch scoring\nml/score.py"]
-      DRIFT["PSI drift report\nml/drift_report.py"]
+    subgraph MLOps["MLOps layer (Part 2)"]
+      FEAT["ml/features.py\nmonth-end snapshots\n+ 90d inactivity label"]
+      TRAIN["ml/train.py\nLR / RF / XGBoost\nchronological split"]
+      MLF["MLflow\ntracking + model registry\nretail-churn-classifier"]
+      ARTIFACT["artifacts/\nmodel + metrics\n+ model card"]
+      REG["ml/registry.py\nmodel resolution"]
+      API["FastAPI\napi/main.py\n(Docker)"]
+      SCORE["Batch scoring\nml/score_churn.py"]
+      MON["ml/monitoring.py\nquality / drift / performance\n/ latency"]
+      RETRAIN["dags/churn_ml_dag.py\nmonitor -> decide -> retrain"]
     end
 
     UCI --> SPLIT
@@ -46,11 +50,20 @@ flowchart LR
     MART --> ST
     DW --> ST
     STG --> ST
-    STG --> TRAIN
+    STG --> FEAT
+    FEAT --> TRAIN
+    TRAIN --> MLF
     TRAIN --> ARTIFACT
-    ARTIFACT --> API
-    ARTIFACT --> SCORE
-    ARTIFACT --> DRIFT
+    MLF --> REG
+    ARTIFACT --> REG
+    REG --> API
+    REG --> SCORE
+    REG --> MON
+    FEAT --> MON
+    MON --> RETRAIN
+    RETRAIN --> TRAIN
+    SCORE --> ST
+    MON --> ST
 ```
 
 ## Layers
@@ -65,9 +78,11 @@ flowchart LR
 - **Warehouse (dw) layer**: star schema — one fact table, four dimensions.
 - **Mart layer**: `mart.customer_rfm` and `mart.sales_monthly`, purpose-built for the dashboard.
 - **Analytics layer**: Streamlit dashboard reading directly from the mart/dw layers.
-- **MLOps layer**: a 90-day repeat-purchase label, temporal customer features, evaluated
-  scikit-learn pipeline, versioned Joblib artifact, batch scorer, FastAPI endpoint, and PSI
-  feature-drift report.
+- **MLOps layer (Part 2)**: month-end snapshot features with a 90-day inactivity churn
+  label, three candidate models selected on a chronological validation block, MLflow
+  experiment tracking and a versioned model registry, a containerized FastAPI service, a
+  batch scorer feeding the dashboard, and a monitoring job whose retraining criteria drive
+  the `churn_ml` DAG. Documented in full in [mlops.md](mlops.md).
 
 ## Why these choices
 - **LocalExecutor / single Postgres container** with two databases (`airflow` for Airflow's
@@ -80,3 +95,11 @@ flowchart LR
   is simpler and safer than incremental upsert logic for dimensions. Incremental behavior is
   still real — it happens at the extract/staging layer, where already-loaded files and
   already-staged rows are skipped on re-run.
+- **Chronological snapshots over a single cutoff** for the churn model: a churn label only
+  has meaning relative to a date, so features are built at every month-end that has a full
+  90-day window after it, and the train/validation/test split cuts those cutoffs in time.
+  A single-cutoff split would have to divide customers at random, which lets a customer's
+  future leak into training.
+- **Local joblib artifact preferred over the registry at serving time**: the API container
+  starts with no network dependency, while still reporting the registry version it
+  corresponds to. `CHURN_MODEL_URI` overrides this to pin a registry version.

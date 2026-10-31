@@ -30,6 +30,9 @@ with DAG(
     schedule="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,
+    # Two concurrent runs both pass extract's "already loaded?" check before
+    # either writes, so every landing file gets ingested twice into raw.
+    max_active_runs=1,
     tags=["retail", "part1"],
 ) as dag:
 
